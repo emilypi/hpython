@@ -6,7 +6,10 @@ import Data.Deriving (deriveEq1)
 
 import Language.Python.Internal.Syntax.Numbers (IntLiteral(..), FloatLiteral(..))
 import Language.Python.Internal.Syntax.Strings
-  (StringPrefix(..), BytesPrefix(..), QuoteType(..), StringType(..), PyChar(..))
+  ( StringPrefix(..), BytesPrefix(..)
+  , RawStringPrefix(..), RawBytesPrefix(..)
+  , QuoteType(..), StringType(..), PyChar(..)
+  )
 import Language.Python.Internal.Syntax.Whitespace (Newline(..))
 
 data PyToken a
@@ -48,6 +51,8 @@ data PyToken a
   | TkIdent String a
   | TkString (Maybe StringPrefix) QuoteType StringType [PyChar] a
   | TkBytes BytesPrefix QuoteType StringType [PyChar] a
+  | TkRawString RawStringPrefix QuoteType StringType [Char] a
+  | TkRawBytes RawBytesPrefix QuoteType StringType [Char] a
   | TkSpace a
   | TkTab a
   | TkNewline Newline a
@@ -147,6 +152,8 @@ pyTokenAnn tk =
     TkIdent _ a -> a
     TkString _ _ _ _ a -> a
     TkBytes _ _ _ _ a -> a
+    TkRawString _ _ _ _ a -> a
+    TkRawBytes _ _ _ _ a -> a
     TkSpace a -> a
     TkTab a -> a
     TkNewline _ a -> a

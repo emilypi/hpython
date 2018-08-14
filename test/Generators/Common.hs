@@ -223,10 +223,15 @@ genNormalWhitespace = Gen.sized $ \n ->
 genStringPrefix :: MonadGen m => m StringPrefix
 genStringPrefix =
   Gen.element
+    [ Prefix_u
+    , Prefix_U
+    ]
+
+genRawStringPrefix :: MonadGen m => m RawStringPrefix
+genRawStringPrefix =
+  Gen.element
     [ Prefix_r
     , Prefix_R
-    , Prefix_u
-    , Prefix_U
     ]
 
 genBytesPrefix :: MonadGen m => m BytesPrefix
@@ -234,7 +239,12 @@ genBytesPrefix =
   Gen.element
     [ Prefix_b
     , Prefix_B
-    , Prefix_br
+    ]
+
+genRawBytesPrefix :: MonadGen m => m RawBytesPrefix
+genRawBytesPrefix =
+  Gen.element
+    [ Prefix_br
     , Prefix_Br
     , Prefix_bR
     , Prefix_BR
@@ -423,6 +433,28 @@ genBytesLiteral gChar =
   genQuoteType <*>
   genStringType <*>
   genString gChar <*>
+  genWhitespaces
+
+genRawStringLiteral :: MonadGen m => m (StringLiteral ())
+genRawStringLiteral =
+  RawStringLiteral () <$>
+  genRawStringPrefix <*>
+  genQuoteType <*>
+  genStringType <*>
+  Gen.list
+    (Range.constant 0 100)
+    (Gen.filter (/= '\0') Gen.ascii) <*>
+  genWhitespaces
+
+genRawBytesLiteral :: MonadGen m => m (StringLiteral ())
+genRawBytesLiteral =
+  RawBytesLiteral () <$>
+  genRawBytesPrefix <*>
+  genQuoteType <*>
+  genStringType <*>
+  Gen.list
+    (Range.constant 0 100)
+    (Gen.filter (/= '\0') Gen.ascii) <*>
   genWhitespaces
 
 genTupleItem :: MonadGen m => m [Whitespace] -> m (Expr v ()) -> m (TupleItem v ())

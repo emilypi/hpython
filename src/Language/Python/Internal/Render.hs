@@ -88,16 +88,24 @@ showRenderOutput =
 showStringPrefix :: StringPrefix -> Text
 showStringPrefix sp =
   case sp of
-    Prefix_r -> "r"
-    Prefix_R -> "R"
     Prefix_u -> "u"
     Prefix_U -> "U"
+
+showRawStringPrefix :: RawStringPrefix -> Text
+showRawStringPrefix sp =
+  case sp of
+    Prefix_r -> "r"
+    Prefix_R -> "R"
 
 showBytesPrefix :: BytesPrefix -> Text
 showBytesPrefix sp =
   case sp of
     Prefix_b -> "b"
     Prefix_B -> "B"
+
+showRawBytesPrefix :: RawBytesPrefix -> Text
+showRawBytesPrefix sp =
+  case sp of
     Prefix_br -> "br"
     Prefix_Br -> "Br"
     Prefix_bR -> "bR"
@@ -171,6 +179,26 @@ showToken t =
         showBytesPrefix sp <>
         quote <>
         renderPyChars qt st s <>
+        quote
+    TkRawString sp qt st s _ ->
+      let
+        quote =
+          Text.pack $
+          (case st of; LongString -> replicate 3; ShortString -> pure) (showQuoteType qt)
+      in
+        showRawStringPrefix sp <>
+        quote <>
+        renderRawPyChars qt st s <>
+        quote
+    TkRawBytes sp qt st s _ ->
+      let
+        quote =
+          Text.pack $
+          (case st of; LongString -> replicate 3; ShortString -> pure) (showQuoteType qt)
+      in
+        showRawBytesPrefix sp <>
+        quote <>
+        renderRawPyChars qt st s <>
         quote
     TkSpace{} -> " "
     TkTab{} -> "\t"
@@ -286,6 +314,84 @@ intToHex n = Text.pack $ go n []
     go 14 = (++"E")
     go 15 = (++"F")
     go b = let (q, r) = quotRem b 16 in go r . go q
+
+renderRawPyChars :: QuoteType -> StringType -> [Char] -> Text
+renderRawPyChars qt st = Text.pack . go
+  where
+    endSingleQuotesShort =
+      snd .
+      foldr
+        (\a (bl, b) ->
+           case a of
+             '\'' -> (True, '\\' : '\'' : b)
+             '\\' ->
+               ( True
+               , if bl
+                 then '\\' : b
+                 else '\\' : '\\' : b
+               )
+             c -> (True, c : b))
+        (False, [])
+
+    endSingleQuotesLong =
+      snd .
+      foldr
+        (\a (bl, b) ->
+           case a of
+             '\'' -> (True, if bl then '\'' : b else '\\' : '\'' : b)
+             '\\' ->
+               ( True
+               , if bl
+                 then '\\' : b
+                 else '\\' : '\\' : b
+               )
+             c -> (True, c : b))
+        (False, [])
+
+    endDoubleQuotesShort =
+      snd .
+      foldr
+        (\a (bl, b) ->
+           case a of
+             '\"' -> (True, '\\' : '\"' : b)
+             '\\' ->
+               ( True
+               , if bl
+                 then '\\' : b
+                 else '\\' : '\\' : b)
+             c -> (True, c : b))
+        (False, [])
+
+    endDoubleQuotesLong =
+      snd .
+      foldr
+        (\a (bl, b) ->
+           case a of
+             '\"' -> (True, if bl then '\"' : b else '\\' : '\"' : b)
+             '\\' ->
+               ( True
+               , if bl
+                 then '\\' : b
+                 else '\\' : '\\' : b)
+             c -> (True, c : b))
+        (False, [])
+
+    escapeTripleDoubleQuotes ('"' : '"' : '"' : cs) = "\\\"\\\"\\\"" ++ cs
+    escapeTripleDoubleQuotes cs = cs
+
+    escapeTripleSingleQuotes ('\'' : '\'' : '\'' : cs) = "\\'\\'\\'" ++ cs
+    escapeTripleSingleQuotes cs = cs
+
+    go s =
+      case (qt, st) of
+        (SingleQuote, ShortString) ->
+          endSingleQuotesShort s
+        (SingleQuote, LongString) ->
+          endSingleQuotesLong (transform escapeTripleSingleQuotes s)
+        (DoubleQuote, ShortString) ->
+          endDoubleQuotesShort s
+        (DoubleQuote, LongString) ->
+          endDoubleQuotesLong (transform escapeTripleDoubleQuotes s)
 
 renderPyChars :: QuoteType -> StringType -> [PyChar] -> Text
 renderPyChars qt st = Text.pack . go
@@ -545,6 +651,12 @@ renderStringLiteral (StringLiteral _ a b c d e) =
   foldMap renderWhitespace e
 renderStringLiteral (BytesLiteral _ a b c d e) =
   TkBytes a b c d () `cons`
+  foldMap renderWhitespace e
+renderStringLiteral (RawStringLiteral _ a b c d e) =
+  TkRawString a b c d () `cons`
+  foldMap renderWhitespace e
+renderStringLiteral (RawBytesLiteral _ a b c d e) =
+  TkRawBytes a b c d () `cons`
   foldMap renderWhitespace e
 
 renderSubscript :: Subscript v a -> RenderOutput
